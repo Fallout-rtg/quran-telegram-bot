@@ -8,7 +8,7 @@ app = Flask(__name__)
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 TG_API = f"https://api.telegram.org/bot{BOT_TOKEN}"
 
-# Полная база данных сур: Номер: [Арабское, Русское, Количество аятов]
+# База данных сур
 SURAH_DATA = {
     1: ["الفاتحة", "Открывающая", 7], 2: ["البقرة", "Корова", 286], 3: ["آل عمران", "Семейство Имрана", 200],
     4: ["النساء", "Женщины", 176], 5: ["المائدة", "Трапеза", 120], 6: ["الأنعام", "Скот", 165],
@@ -29,24 +29,24 @@ SURAH_DATA = {
     49: ["الحجرات", "Комнаты", 18], 50: ["ق", "Каф", 45], 51: ["الذاريات", "Рассеивающие", 60],
     52: ["الطور", "Гора", 49], 53: ["النجم", "Звезда", 62], 54: ["القمر", "Луна", 55],
     55: ["الرحمن", "Милостивый", 78], 56: ["الواقعة", "Событие", 96], 57: ["الحديد", "Железо", 29],
-    58: ["المجادلة", "Препирающаяся", 22], 59: ["الحشر", "Собрание", 24], 60: ["الممتحنة", "Испытуемая", 13],
-    61: ["الصف", "Ряды", 14], 62: ["الجمعة", "Пятница", 11], 63: ["المنافقون", "Лицемеры", 11],
-    64: ["التغابن", "Взаимное обманывание", 18], 65: ["الطلاق", "Развод", 12], 66: ["التحريم", "Запрещение", 12],
-    67: ["الملك", "Власть", 30], 68: ["القلم", "Письменная трость", 52], 69: ["الحاقة", "Неминуемое", 52],
+    58: ["المجادلة", "Препирающаяся", 22], 59: ["الحشر", "Собрание", 24], 60: ["المмتحنة", "Испытуемая", 13],
+    61: ["الصف", "Ряды", 14], 62: ["الجمعة", "Пятница", 11], 63: ["المнаفقون", "Лицемеры", 11],
+    64: ["التغابн", "Взаимное обманывание", 18], 65: ["الطلاق", "Развод", 12], 66: ["التحريم", "Запрещение", 12],
+    67: ["الملк", "Власть", 30], 68: ["القلم", "Письменная трость", 52], 69: ["الحاقة", "Неминуемое", 52],
     70: ["المعارج", "Ступени", 44], 71: ["نوح", "Нух", 28], 72: ["الجن", "Джинны", 28],
     73: ["المزمل", "Закутавшийся", 20], 74: ["المدثر", "Завернувшийся", 56], 75: ["القيامة", "Воскресение", 40],
     76: ["الإنسان", "Человек", 31], 77: ["المرسلات", "Посылаемые", 50], 78: ["النبأ", "Весть", 40],
-    79: ["الناзعات", "Исторгающие", 46], 80: ["عبس", "Нахмурился", 42], 81: ["التكوير", "Скручивание", 29],
+    79: ["الназعات", "Исторгающие", 46], 80: ["عبس", "Нахмурился", 42], 81: ["التكوير", "Скручивание", 29],
     82: ["الانفطار", "Раскалывание", 19], 83: ["المطففين", "Обвешивающие", 36], 84: ["الانشقاق", "Разверзание", 25],
     85: ["البروج", "Созвездия", 22], 86: ["الطارق", "Ночной путник", 17], 87: ["الأعلى", "Всевышний", 19],
-    88: ["الغاشية", "Покрывающее", 26], 89: ["الفجر", "Заря", 30], 90: ["البلد", "Город", 20],
+    88: ["الغاشية", "Покрывающее", 26], 89: ["الفجر", "Заря", 30], 90: ["البلд", "Город", 20],
     91: ["الشمس", "Солнце", 15], 92: ["الليل", "Ночь", 21], 93: ["الضحى", "Утро", 11],
     94: ["الشرح", "Раскрытие", 8], 95: ["التين", "Смоковница", 8], 96: ["العلق", "Сгусток", 19],
     97: ["القدر", "Предопределение", 5], 98: ["البينة", "Ясное знамение", 8], 99: ["الزلزلة", "Землетрясение", 8],
     100: ["العاديات", "Скачущие", 11], 101: ["القارعة", "Бедствие", 11], 102: ["التكاثر", "Страсть к приумножению", 8],
     103: ["العصر", "Предвечернее время", 3], 104: ["الهمزة", "Хулитель", 9], 105: ["الفيل", "Слон", 5],
     106: ["قريش", "Курайшиты", 4], 107: ["الماعون", "Подаяние", 7], 108: ["الكوثر", "Обильное", 3],
-    109: ["الكافرون", "Неверующие", 6], 110: ["النصر", "Помощь", 3], 111: ["المسد", "Пальмовые волокна", 5],
+    109: ["الكافرون", "Неверующие", 6], 110: ["النصر", "Помощь", 3], 111: ["المسд", "Пальмовые волокна", 5],
     112: ["الإخلاص", "Очищение веры", 4], 113: ["الفلق", "Рассвет", 5], 114: ["الناس", "Люди", 6]
 }
 
@@ -77,20 +77,15 @@ def fetch_tafsir(surah: int, ayah: int):
     return ""
 
 def send_message(chat_id, text, reply_markup=None):
-    limit = 3900
-    if len(text) <= limit:
-        requests.post(f"{TG_API}/sendMessage", json={
-            "chat_id": chat_id, "text": text, "parse_mode": "HTML", 
-            "disable_web_page_preview": True, "reply_markup": reply_markup
-        })
-    else:
-        for i in range(0, len(text), limit):
-            part = text[i:i+limit]
-            markup = reply_markup if i + limit >= len(text) else None
-            requests.post(f"{TG_API}/sendMessage", json={
-                "chat_id": chat_id, "text": part, "parse_mode": "HTML", 
-                "disable_web_page_preview": True, "reply_markup": markup
-            })
+    payload = {
+        "chat_id": chat_id,
+        "text": text,
+        "parse_mode": "HTML",
+        "disable_web_page_preview": True
+    }
+    if reply_markup:
+        payload["reply_markup"] = reply_markup
+    requests.post(f"{TG_API}/sendMessage", json=payload)
 
 def send_audio_group(chat_id, ayahs_data):
     media = []
@@ -136,20 +131,17 @@ def webhook():
             "📖 <b>Как пользоваться:</b>\n"
             "• Один аят — <code>2:255</code>\n"
             "• Диапазон аятов — <code>2:1-3</code>\n"
-            "• Список сур — /surahs\n"
-            "• Максимальный диапазон аятов — 10\n\n"
+            "• Список сур — /surahs\n\n"
             "Пусть Аллах сделает это знание полезным для вас!"
         )
         send_message(chat_id, welcome)
         return "OK", 200
 
     if text == "/surahs":
-        # Делим на 3 сообщения по 40 сур для обхода лимита
         parts = [list(SURAH_DATA.items())[i:i + 40] for i in range(0, len(SURAH_DATA), 40)]
         for idx, part in enumerate(parts):
-            msg = f"📜 <b>Список сур Корана (Часть {idx+1}):</b>\n<blockquote expandable>"
+            msg = f"📜 <b>Список сур (Часть {idx+1}):</b>\n<blockquote expandable>"
             for n, info in part:
-                # Арабское название в конце, чтобы не ломать RTL
                 msg += f"{n}. <b>{info[1]}</b> — {info[2]} аят.  |  {info[0]}\n"
             msg += "</blockquote>"
             send_message(chat_id, msg)
@@ -157,46 +149,38 @@ def webhook():
 
     match = re.match(r'^(\d+):(\d+)(?:-(\d+))?$', text)
     if not match:
-        if "message" in update: send_message(chat_id, "❌ Формат: <code>сура:аят</code> или <code>сура:аят-аят</code>")
         return "OK", 200
 
     surah, start_ayah = int(match.group(1)), int(match.group(2))
     end_ayah = int(match.group(3)) if match.group(3) else start_ayah
 
-    if surah not in SURAH_DATA:
-        send_message(chat_id, "❌ Суры с таким номером нет (1-114).")
-        return "OK", 200
-    
-    max_a = SURAH_DATA[surah][2]
-    if start_ayah < 1 or end_ayah > max_a or start_ayah > end_ayah:
-        send_message(chat_id, f"❌ В суре {surah} всего {max_a} аятов.")
-        return "OK", 200
-
-    if (end_ayah - start_ayah) >= 10:
-        send_message(chat_id, "❌ Лимит: не более 10 аятов за раз.")
+    if surah not in SURAH_DATA or start_ayah < 1 or (end_ayah - start_ayah) >= 10:
+        send_message(chat_id, "❌ Ошибка: проверьте номер суры или лимит (макс. 10 аятов).")
         return "OK", 200
 
     ayahs_data = fetch_range_data(surah, start_ayah, end_ayah)
     if not ayahs_data:
-        send_message(chat_id, "❌ Не удалось загрузить данные.")
         return "OK", 200
 
     is_single = (start_ayah == end_ayah)
     s_ar, s_ru = SURAH_DATA[surah][0], SURAH_DATA[surah][1]
     
-    # 1. Текст аятов
-    full_text = f"📖 <b>Сура {surah}: {s_ru}</b> ({s_ar})\n"
-    full_text += f"<b>Аят{'т' if not is_single else ''} {start_ayah}{'' if is_single else '-'+str(end_ayah)}</b>\n\n"
+    # Формируем текст
+    header = f"📖 <b>Сура {surah}: {s_ru}</b> ({s_ar})\n"
+    header += f"<b>Аят{'т' if not is_single else ''} {start_ayah}{'' if is_single else '-'+str(end_ayah)}</b>\n\n"
+    
+    body = ""
     for a in ayahs_data:
         if not is_single:
-            full_text += f"<b>— Аят {a['num']} —</b>\n"
-        full_text += f"<code>{a['arabic']}</code>\n\n"
-        full_text += f"<i>{a['translation']}</i>\n\n"
+            body += f"<b>— Аят {a['num']} —</b>\n"
+        body += f"{a['arabic']}\n\n"
+        body += f"<i>{a['translation']}</i>\n\n"
         if not is_single:
-            full_text += "⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯\n\n"
-    send_message(chat_id, full_text)
+            body += "⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯\n\n"
+            
+    send_message(chat_id, header + body)
 
-    # 2. Толкование
+    # Толкование
     combined_tafsir = ""
     for a in ayahs_data:
         t_content = fetch_tafsir(surah, a['num'])
@@ -208,7 +192,6 @@ def webhook():
         nav = get_nav_buttons(surah, start_ayah, end_ayah)
         send_message(chat_id, f"{t_header}\n<blockquote expandable>{combined_tafsir.strip()}</blockquote>", reply_markup=nav)
 
-    # 3. Аудио
     send_audio_group(chat_id, ayahs_data)
     return "OK", 200
 
