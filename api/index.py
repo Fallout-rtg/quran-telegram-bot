@@ -9,21 +9,22 @@ app = Flask(__name__)
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 TG_API = f"https://api.telegram.org/bot{BOT_TOKEN}"
 
-def fetch_ayah_data(surah: int, ayah: int):
-    url = f"https://api.alquran.cloud/v1/ayah/{surah}:{ayah}/editions/quran-uthmani,ru.kuliev,ar.alafasy"
-    try:
-        resp = requests.get(url, timeout=10)
-        if resp.status_code == 200:
-            data = resp.json()
-            if data.get('status') == 'OK':
-                editions = data['data']
-                return {
-                    'arabic': next((e['text'] for e in editions if e['edition']['identifier'] == 'quran-uthmani'), ""),
-                    'translation': next((e['text'] for e in editions if e['edition']['identifier'] == 'ru.kuliev'), ""),
-                    'audio': next((e['audio'] for e in editions if e['edition']['identifier'] == 'ar.alafasy'), None)
-                }
-    except: pass
-    return None
+def fetch_range_data(surah: int, start: int, end: int):  
+    ayahs_info = []
+    for a_num in range(start, end + 1):
+        url = f"https://api.alquran.cloud/v1/ayah/{surah}:{a_num}/editions/quran-uthmani,ru.kuliev,ar.alafasy"
+        try:
+            resp = requests.get(url, timeout=10)
+            if resp.status_code == 200:
+                data = resp.json()['data']
+                ayahs_info.append({
+                    'num': a_num,
+                    'arabic': next(e['text'] for e in data if e['edition']['identifier'] == 'quran-uthmani'),
+                    'translation': next(e['text'] for e in data if e['edition']['identifier'] == 'ru.kuliev'),
+                    'audio': next(e['audio'] for e in data if e['edition']['identifier'] == 'ar.alafasy')
+                })
+        except: continue
+    return ayahs_info
 
 def fetch_tafsir(surah: int, ayah: int):
     url = f"https://cdn.jsdelivr.net/gh/spa5k/tafsir_api@main/tafsir/ru-tafseer-al-saddi/{surah}/{ayah}.json"
@@ -35,7 +36,6 @@ def fetch_tafsir(surah: int, ayah: int):
     return ""
 
 def send_message(chat_id, text):
-    # Функция для отправки длинных сообщений по частям
     limit = 4000
     for i in range(0, len(text), limit):
         part = text[i:i+limit]
@@ -70,13 +70,13 @@ def webhook():
             "толкование (тафсир) шейха ас-Саади и прекрасное аудио-чтение.\n\n"
             "📖 <b>Как пользоваться:</b>\n"
             "• Один аят — <code>2:255</code>\n"
-            "• Диапазон аятов — <code>2:1-3</code>\n\n"
+            "• Диапазон аятов — <code>2:1-3</code>\n"
+            "• Максимальный диапазон аятов — 10\n\n"
             "Пусть Аллах сделает это знание полезным для вас!"
         )
         send_message(chat_id, welcome)
         return "OK", 200
 
-    # Регулярка для одиночного аята (2:255) или диапазона (2:1-3)
     match = re.match(r'^(\d+):(\d+)(?:-(\d+))?$', text)
     if not match:
         send_message(chat_id, "❌ Неверный формат. Используйте <code>сура:аят</code> или <code>сура:аят-аят</code>")
@@ -86,37 +86,36 @@ def webhook():
     start_ayah = int(match.group(2))
     end_ayah = int(match.group(3)) if match.group(3) else start_ayah
 
-    if not (1 <= surah <= 114) or start_ayah > end_ayah or (end_ayah - start_ayah) > 10:
-        send_message(chat_id, "❌ Ошибка в номерах или диапазон слишком велик (макс. 10 аятов за раз).")
+    if not (1 <= surah <= 114) or start_ayah > end_ayah or (end_ayah - start_ayah) >= 10:
+        send_message(chat_id, "❌ Ошибка: неверные номера или превышен лимит (макс. 10 аятов).")
         return "OK", 200
 
-    for a_num in range(start_ayah, end_ayah + 1):
-        data = fetch_ayah_data(surah, a_num)
-        if not data:
-            send_message(chat_id, f"❌ Аят {surah}:{a_num} не найден.")
-            continue
+    ayahs_data = fetch_range_data(surah, start_ayah, end_ayah)
+    if not ayahs_data:
+        send_message(chat_id, "❌ Не удалось найти указанные аяты.")
+        return "OK", 200
 
-        # 1. Отправляем текст аята и перевод
-        main_text = (
-            f"📖 <b>Сура {surah}, Аят {a_num}</b>\n\n"
-            f"🕋 <code>{data['arabic']}</code>\n\n"
-            f"🇷🇺 <b>Перевод:</b> {data['translation']}"
-        )
-        send_message(chat_id, main_text)
+    full_text = f"📖 <b>Сура {surah}, Аяты {start_ayah}-{end_ayah}</b>\n\n"
+    full_tafsir = f"📚 <b>Толкование (ас-Саади) к аятам {start_ayah}-{end_ayah}:</b>\n"
+    
+    combined_tafsir_content = ""
+    
+    for a in ayahs_data:
+        full_text += f"<b>Аят {a['num']}</b>\n<code>{a['arabic']}</code>\n<i>{a['translation']}</i>\n\n"
+        
+        t_content = fetch_tafsir(surah, a['num'])
+        if t_content:
+            combined_tafsir_content += f"📌 <b>Аят {a['num']}:</b>\n{t_content}\n\n"
 
-        # 2. Отправляем тафсир отдельным сворачиваемым сообщением
-        tafsir_text = fetch_tafsir(surah, a_num)
-        if tafsir_text:
-            # Сворачиваемая цитата HTML
-            formatted_tafsir = (
-                f"📚 <b>Толкование аята {a_num}:</b>\n"
-                f"<blockquote expandable>{tafsir_text}</blockquote>"
-            )
-            send_message(chat_id, formatted_tafsir)
+    send_message(chat_id, full_text)
 
-        # 3. Аудио
-        if data['audio']:
-            send_audio(chat_id, data['audio'], f"Сура {surah}, Аят {a_num}")
+    if combined_tafsir_content:
+        final_tafsir = full_tafsir + f"<blockquote expandable>{combined_tafsir_content}</blockquote>"
+        send_message(chat_id, final_tafsir)
+
+    for a in ayahs_data:
+        if a['audio']:
+            send_audio(chat_id, a['audio'], f"Сура {surah}, Аят {a['num']}")
 
     return "OK", 200
 
