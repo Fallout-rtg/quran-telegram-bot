@@ -1,5 +1,4 @@
 import os
-import logging
 import re
 import requests
 from flask import Flask, request
@@ -9,7 +8,7 @@ app = Flask(__name__)
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 TG_API = f"https://api.telegram.org/bot{BOT_TOKEN}"
 
-def fetch_range_data(surah: int, start: int, end: int):  
+def fetch_range_data(surah: int, start: int, end: int):
     ayahs_info = []
     for a_num in range(start, end + 1):
         url = f"https://api.alquran.cloud/v1/ayah/{surah}:{a_num}/editions/quran-uthmani,ru.kuliev,ar.alafasy"
@@ -35,32 +34,56 @@ def fetch_tafsir(surah: int, ayah: int):
     except: pass
     return ""
 
-def send_message(chat_id, text):
+def send_message(chat_id, text, reply_markup=None):
     limit = 4000
     for i in range(0, len(text), limit):
         part = text[i:i+limit]
-        requests.post(f"{TG_API}/sendMessage", json={
+        payload = {
             "chat_id": chat_id,
             "text": part,
-            "parse_mode": "HTML"
-        })
+            "parse_mode": "HTML",
+            "disable_web_page_preview": True
+        }
+        if reply_markup and i + limit >= len(text):
+            payload["reply_markup"] = reply_markup
+        requests.post(f"{TG_API}/sendMessage", json=payload)
 
 def send_audio(chat_id, audio_url, title):
-    requests.post(f"{TG_API}/sendAudio", json={
-        "chat_id": chat_id,
-        "audio": audio_url,
-        "title": title
-    })
+    requests.post(f"{TG_API}/sendAudio", json={"chat_id": chat_id, "audio": audio_url, "title": title})
+
+def get_nav_buttons(surah, start, end):
+    buttons = []
+    step = (end - start) + 1
+    
+    row = []
+    if start > 1:
+        prev_s = max(1, start - step)
+        prev_e = start - 1
+        label = f"⬅️ {surah}:{prev_s}-{prev_e}" if step > 1 else f"⬅️ {surah}:{prev_s}"
+        row.append({"text": label, "callback_data": f"{surah}:{prev_s}-{prev_e}" if step > 1 else f"{surah}:{prev_s}"})
+    
+    if end < 286: 
+        next_s = end + 1
+        next_e = end + step
+        label = f"{surah}:{next_s}-{next_e} ➡️" if step > 1 else f"{surah}:{next_s} ➡️"
+        row.append({"text": label, "callback_data": f"{surah}:{next_s}-{next_e}" if step > 1 else f"{surah}:{next_s}"})
+    
+    if row: buttons.append(row)
+    return {"inline_keyboard": buttons}
 
 @app.route('/', methods=['POST'])
 def webhook():
     update = request.get_json()
-    if not update or "message" not in update:
-        return "OK", 200
+    if not update: return "OK", 200
 
-    msg = update["message"]
-    chat_id = msg["chat"]["id"]
-    text = msg.get("text", "").strip()
+    if "message" in update:
+        chat_id = update["message"]["chat"]["id"]
+        text = update["message"].get("text", "").strip()
+    elif "callback_query" in update:
+        chat_id = update["callback_query"]["message"]["chat"]["id"]
+        text = update["callback_query"]["data"]
+    else:
+        return "OK", 200
 
     if text.startswith("/start"):
         welcome = (
@@ -79,39 +102,46 @@ def webhook():
 
     match = re.match(r'^(\d+):(\d+)(?:-(\d+))?$', text)
     if not match:
-        send_message(chat_id, "❌ Неверный формат. Используйте <code>сура:аят</code> или <code>сура:аят-аят</code>")
+        if "message" in update:
+            send_message(chat_id, "❌ Неверный формат. Используйте <code>сура:аят</code> или <code>сура:аят-аят</code>")
         return "OK", 200
 
-    surah = int(match.group(1))
-    start_ayah = int(match.group(2))
+    surah, start_ayah = int(match.group(1)), int(match.group(2))
     end_ayah = int(match.group(3)) if match.group(3) else start_ayah
 
-    if not (1 <= surah <= 114) or start_ayah > end_ayah or (end_ayah - start_ayah) >= 10:
-        send_message(chat_id, "❌ Ошибка: неверные номера или превышен лимит (макс. 10 аятов).")
+    if not (1 <= surah <= 114) or (end_ayah - start_ayah) >= 10:
+        send_message(chat_id, "❌ Ошибка: неверные номера или лимит 10 аятов.")
         return "OK", 200
 
     ayahs_data = fetch_range_data(surah, start_ayah, end_ayah)
     if not ayahs_data:
-        send_message(chat_id, "❌ Не удалось найти указанные аяты.")
+        send_message(chat_id, "❌ Аяты не найдены.")
         return "OK", 200
 
-    full_text = f"📖 <b>Сура {surah}, Аяты {start_ayah}-{end_ayah}</b>\n\n"
-    full_tafsir = f"📚 <b>Толкование (ас-Саади) к аятам {start_ayah}-{end_ayah}:</b>\n"
+    is_single = (start_ayah == end_ayah)
     
-    combined_tafsir_content = ""
-    
-    for a in ayahs_data:
-        full_text += f"<b>Аят {a['num']}</b>\n<code>{a['arabic']}</code>\n<i>{a['translation']}</i>\n\n"
-        
-        t_content = fetch_tafsir(surah, a['num'])
-        if t_content:
-            combined_tafsir_content += f"📌 <b>Аят {a['num']}:</b>\n{t_content}\n\n"
+    if is_single:
+        a = ayahs_data[0]
+        full_text = f"📖 <b>Сура {surah}, Аят {start_ayah}</b>\n\n{a['arabic']}\n\n{a['translation']}"
+    else:
+        full_text = f"📖 <b>Сура {surah}, Аяты {start_ayah}-{end_ayah}</b>\n\n"
+        for a in ayahs_data:
+            full_text += f"<b>Аят {a['num']}</b>\n{a['arabic']}\n<i>{a['translation']}</i>\n\n"
 
     send_message(chat_id, full_text)
 
-    if combined_tafsir_content:
-        final_tafsir = full_tafsir + f"<blockquote expandable>{combined_tafsir_content}</blockquote>"
-        send_message(chat_id, final_tafsir)
+    combined_tafsir = ""
+    for a in ayahs_data:
+        t_content = fetch_tafsir(surah, a['num'])
+        if t_content:
+            combined_tafsir += (f"📌 <b>Аят {a['num']}:</b>\n" if not is_single else "") + f"{t_content}\n\n"
+
+    if combined_tafsir:
+        header = f"📚 <b>Толкование {surah}:{start_ayah}</b>" if is_single else f"📚 <b>Толкование {surah}:{start_ayah}-{end_ayah}</b>"
+        final_tafsir = f"{header}\n<blockquote expandable>{combined_tafsir.strip()}</blockquote>"
+        
+        nav = get_nav_buttons(surah, start_ayah, end_ayah)
+        send_message(chat_id, final_tafsir, reply_markup=nav)
 
     for a in ayahs_data:
         if a['audio']:
