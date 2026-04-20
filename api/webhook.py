@@ -1,8 +1,8 @@
 import json
 import os
 import logging
+import re
 import aiohttp
-from aiohttp import web
 
 logging.basicConfig(level=logging.INFO)
 
@@ -45,13 +45,15 @@ async def send_message(chat_id: int, text: str, parse_mode: str = "HTML"):
     url = f"{TG_API}/sendMessage"
     payload = {"chat_id": chat_id, "text": text, "parse_mode": parse_mode}
     async with aiohttp.ClientSession() as session:
-        await session.post(url, json=payload)
+        async with session.post(url, json=payload) as resp:
+            return await resp.json()
 
 async def send_audio(chat_id: int, audio_url: str, title: str):
     url = f"{TG_API}/sendAudio"
     payload = {"chat_id": chat_id, "audio": audio_url, "title": title}
     async with aiohttp.ClientSession() as session:
-        await session.post(url, json=payload)
+        async with session.post(url, json=payload) as resp:
+            return await resp.json()
 
 async def handle_update(update: dict):
     if "message" not in update:
@@ -69,7 +71,6 @@ async def handle_update(update: dict):
         )
         return
 
-    import re
     match = re.match(r'^(\d+):(\d+)$', text)
     if not match:
         await send_message(chat_id, "❌ Неверный формат. Используйте <code>сура:аят</code>")
@@ -106,17 +107,14 @@ async def handle_update(update: dict):
     else:
         await send_message(chat_id, "⚠️ Аудио не найдено.")
 
-async def webhook_handler(request):
-    try:
-        data = await request.json()
-        await handle_update(data)
-    except Exception as e:
-        logging.error(f"Ошибка обработки: {e}")
-    return web.Response(text="OK")
-
-app = web.Application()
-app.router.add_post("/api/webhook", webhook_handler)
-app.router.add_get("/api/webhook", webhook_handler)  # для проверки
-
-if __name__ == "__main__":
-    web.run_app(app, host='0.0.0.0', port=int(os.getenv('PORT', 8080)))
+async def handler(request):
+    if request.method == "POST":
+        try:
+            body = await request.json()
+            await handle_update(body)
+        except Exception as e:
+            logging.error(f"Ошибка обработки: {e}")
+    return {
+        "statusCode": 200,
+        "body": "OK"
+                        }
