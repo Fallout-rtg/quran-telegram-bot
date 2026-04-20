@@ -167,16 +167,16 @@ def webhook():
     
     # Формируем текст
     header = f"📖 <b>Сура {surah}: {s_ru}</b> ({s_ar})\n"
-    header += f"<b>Аят{'т' if not is_single else ''} {start_ayah}{'' if is_single else '-'+str(end_ayah)}</b>\n\n"
+    header += f"<b>Аят{'ы' if not is_single else ''} {start_ayah}{'' if is_single else '-'+str(end_ayah)}</b>\n\n"
     
     body = ""
     for a in ayahs_data:
         if not is_single:
-            body += f"<b>— Аят {a['num']} —</b>\n"
-        body += f"{a['arabic']}\n\n"
+            body += f"<b> Аят{a['num']}</b>\n"
+        body += f"{a['arabic']}\n"
         body += f"<i>{a['translation']}</i>\n\n"
         if not is_single:
-            body += "⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯\n\n"
+            body += " \n\n"
             
     send_message(chat_id, header + body)
 
