@@ -146,15 +146,13 @@ def webhook():
 
     if text == "/surahs":
         # Разбиваем список сур на 3 части, чтобы не превышать лимит
-        full_list = []
-        current_part = "📜 <b>Список сур Корана (Часть {p}):</b>\n<blockquote expandable>"
-        
         parts = [list(SURAH_DATA.items())[i:i + 40] for i in range(0, len(SURAH_DATA), 40)]
         
         for idx, part in enumerate(parts):
-            msg = current_part.format(p=idx+1)
+            msg = f"📜 <b>Список сур Корана (Часть {idx+1}):</b>\n<blockquote expandable>"
             for n, info in part:
-                msg += f"{n}. {info[0]} ({info[1]}) — {info[2]} аят.\n"
+                # Сначала номер и русское название, арабское — в конце через тире
+                msg += f"{n}. <b>{info[1]}</b> — {info[2]} аят.  |  {info[0]}\n"
             msg += "</blockquote>"
             send_message(chat_id, msg)
         return "OK", 200
