@@ -140,8 +140,10 @@ def webhook():
             "inline_keyboard": [
                 [
                     {
-                        "text": "🌐Открыть наш сайт", 
-                        "url": "https://quran-telegram-bot-eight.vercel.app"
+                        "text": "🌐 Открыть наш сайт", 
+                        "web_app": {
+                            "url": "https://quran-telegram-bot-eight.vercel.app"
+                        }
                     }
                 ]
             ]
