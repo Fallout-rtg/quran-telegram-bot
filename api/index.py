@@ -136,7 +136,17 @@ def webhook():
             "• Список сур — /surahs\n\n"
             "Пусть Аллах сделает это знание полезным для вас!"
         )
-        send_message(chat_id, welcome)
+        site_markup = {
+            "inline_keyboard": [
+                [
+                    {
+                        "text": "🌐Открыть наш сайт", 
+                        "url": "https://quran-telegram-bot-eight.vercel.app"
+                    }
+                ]
+            ]
+        }
+        send_message(chat_id, welcome, reply_markup=site_markup)
         return "OK", 200
 
     if text == "/surahs":
