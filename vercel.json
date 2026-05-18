@@ -6,7 +6,7 @@
     { "src": "assets/**", "use": "@vercel/static" }
   ],
   "rewrites": [
-    { "source": "/bot-webhook", "destination": "/api/index" },
-    { "source": "/(.*)", "destination": "/index.html" }
+    { "source": "/bot-webhook", "destination": "/api/index.py" },
+    { "source": "/((?!bot-webhook).*)" , "destination": "/index.html" }
   ]
 }
